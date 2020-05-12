@@ -1,10 +1,12 @@
 class NBTByte extends Number {
+  /**
+   * 1(1). byte
+   * */
   constructor (data) {
     super(data)
   }
 
   get $$id () { return 1 }
-  get size () { return 1 }
 
   toBuffer () {
     return Buffer.from([this])
@@ -12,14 +14,14 @@ class NBTByte extends Number {
 }
 
 class NBTShort extends Number {
+  /**
+   * 1-2(2). short integer
+   * */
   constructor (data) {
     super(data)
   }
 
   get $$id () { return 2 }
-  get size () {
-    return 2
-  }
 
   toBuffer () {
     const buf = Buffer.alloc(2)
@@ -29,14 +31,14 @@ class NBTShort extends Number {
 }
 
 class NBTInt extends Number {
+  /**
+   * 1-4(4). integer
+   * */
   constructor (data) {
     super(data)
   }
 
   get $$id () { return 3 }
-  get size () {
-    return 4
-  }
 
   toBuffer () {
     const buf = Buffer.alloc(4)
@@ -46,31 +48,32 @@ class NBTInt extends Number {
 }
 
 class NBTLong extends Number {
+  /**
+   * 1-8(8). long integer
+   * */
   constructor (data) {
     super(data)
+    this._bigint = data
   }
 
   get $$id () { return 4 }
-  get size () {
-    return 8
-  }
 
   toBuffer () {
     const buf = Buffer.alloc(8)
-    buf.writeIntLE(this, 0, 8)
+    buf.writeBigInt64LE(this._bigint)
     return buf
   }
 }
 
 class NBTFloat extends Number {
+  /**
+   * 1-4(4). float
+   * */
   constructor (data) {
     super(data)
   }
 
   get $$id () { return 5 }
-  get size () {
-    return 4
-  }
 
   toBuffer () {
     const buf = Buffer.alloc(4)
@@ -80,14 +83,14 @@ class NBTFloat extends Number {
 }
 
 class NBTDouble extends Number {
+  /**
+   * 1-8(8). double
+   * */
   constructor (data) {
     super(data)
   }
 
   get $$id () { return 6 }
-  get size () {
-    return 8
-  }
 
   toBuffer () {
     const buf = Buffer.alloc(8)
@@ -106,9 +109,6 @@ class NBTByteArray extends Array {
   }
 
   get $$id () { return 7 }
-  get size () {
-    return this._data.length
-  }
 
   toBuffer () {
     // allocate buffer
@@ -134,9 +134,6 @@ class NBTIntArray extends Array {
   }
 
   get $$id () { return 11 }
-  get size () {
-    return this._data.length * 4
-  }
 
   toBuffer () {
     // allocate buffer
@@ -162,9 +159,6 @@ class NBTLongArray extends Array {
   }
 
   get $$id () { return 12 }
-  get size () {
-    return this._data.length * 8
-  }
 
   toBuffer () {
     // allocate buffer
@@ -188,12 +182,13 @@ class NBTTagArray extends Array {
    * */
   constructor (tagLength, tagId) {
     super(tagLength)
-    this._tagId = tagId
+    this.$$tagId = tagId
+    this.$$index = null
   }
 
   get $$id () { return 9 }
   get tagId () {
-    return this._tagId
+    return this.$$tagId
   }
 
   get tagLength () {
@@ -204,7 +199,7 @@ class NBTTagArray extends Array {
     const buf = Buffer.alloc(1 + 4)
     
     // write tag type id
-    buf.writeInt8(this._tagId)
+    buf.writeInt8(this.$$tagId)
     
     // write length
     buf.writeUInt32LE(this.length, 1)
@@ -227,10 +222,11 @@ class NBTString extends String {
   get $$id () { return 8 }
 
   toBuffer () {
-    const buf = Buffer.alloc(2 + this.length)
+    const stringLength = Buffer.from(this).length
+    const buf = Buffer.alloc(2 + stringLength)
     
     // write length
-    buf.writeUInt16LE(this.length)
+    buf.writeUInt16LE(stringLength)
 
     // write string
     buf.write(this.toString(), 2)
@@ -252,6 +248,7 @@ class NBTCoupound extends Object {
    * */
   constructor (data) {
     super(data)
+    this.$$index = null
   }
 
   get $$id () { return 10 }
@@ -261,8 +258,11 @@ class NBTCoupound extends Object {
 
     // get buffer of every tags. and append to buffer created above.
     const bufs = Object.keys(this).map((tagName) => {
+      if (tagName === '$$index' || tagName === '$$offset') return
+
       const tag = this[tagName]
       const tagBuf = tag.toBuffer()
+      const tagIndex = tag.$$index
 
       const buf = Buffer.alloc(1 + 2 + tagName.length + tagBuf.length)
     
@@ -278,8 +278,11 @@ class NBTCoupound extends Object {
       // copy tag buffer to buffer created above
       tagBuf.copy(buf, 3 + tagName.length)
   
-      return buf
+      return [buf, tagIndex]
     })
+      .filter((e) => e)
+      .sort((pairA, pairB) => pairA[1] - pairB[1])
+      .map(([buf, tagIndex]) => buf)
     return Buffer.concat([buf, ...bufs, Buffer.from([0])])
   }
 }

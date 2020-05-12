@@ -51,13 +51,13 @@ class NBTReader {
   }
 
   _readTagInt () {
-    const bytes = this._buf.readIntLE(this._offset, 4)
+    const bytes = this._buf.readInt32LE(this._offset)
     this._offset += 4
     return new NBTInt(bytes)
   }
 
   _readTagLong () {
-    const bytes = this._buf.readIntLE(this._offset, 8)
+    const bytes = this._buf.readBigInt64LE(this._offset)
     this._offset += 8
     return new NBTLong(bytes)
   }
@@ -123,12 +123,14 @@ class NBTReader {
     tagArray.fill(true)
     for (let i = 0; i < tagArray.length; i++) {
       tagArray[i] = readMethod.call(this)
+      tagArray[i].$$index = i
     }
     return tagArray
   }
 
   _readTagCompound () {
     const tags = new NBTCoupound()
+    let i = 0
     while (true) {
       // read tag type
       const tagType = this._buf.readUIntLE(this._offset, 1)
@@ -145,6 +147,8 @@ class NBTReader {
       // if (name === 'InterativeText')
       //   console.log(payload + '\n----------------------------------')
       tags[name] = payload
+      tags[name].$$index = i++
+      tags[name].$$offset = this._offset
     }
     // console.log(tags)
     return tags
@@ -154,10 +158,11 @@ class NBTReader {
     const ret = []
     while (this._offset < this._buf.length) {
       const tagType = this._readTagByte()
+      
       if (Number(tagType) !== 10)
         throw new Error('Expected a tag compound')
+
       const name = this._readTagString()
-      // console.log('this._buf', this._buf, 'name', name)
       ret.push([name, this._readTagCompound()])
     }
     return ret
