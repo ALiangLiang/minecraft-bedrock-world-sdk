@@ -9,6 +9,8 @@ const {
   NBTIntArray,
   NBTLongArray,
   NBTTagArray,
+  NBTString,
+  NBTCoupound,
 } = require('./NBTTags')
 
 class NBTReader {
@@ -109,7 +111,7 @@ class NBTReader {
 
     const string = this._buf.toString('utf8', this._offset, this._offset + length)
     this._offset += length
-    return string
+    return new NBTString(string)
   }
 
   _readTagArray () {
@@ -126,15 +128,19 @@ class NBTReader {
   }
 
   _readTagCompound () {
-    const tags = {}
+    const tags = new NBTCoupound()
     while (true) {
+      // read tag type
       const tagType = this._buf.readUIntLE(this._offset, 1)
       this._offset += 1
 
       if (tagType === 0)
         break
 
+      // read tag name
       const name = this._readTagString()
+
+      // read tag padload
       const payload = this._readTagMap[tagType].call(this)
       // if (name === 'InterativeText')
       //   console.log(payload + '\n----------------------------------')
